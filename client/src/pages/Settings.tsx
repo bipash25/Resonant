@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { User, Lock, Palette, Volume2, Save, Check } from 'lucide-react';
+import { User, Lock, Palette, Volume2, Save, Check, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { usePlayerStore } from '../store/playerStore';
+import { useThemeStore } from '../store/themeStore';
+import { useLastfmStore } from '../store/lastfmStore';
+import { useSpotifyStore } from '../store/spotifyStore';
 import api from '../lib/api';
 
-type Theme = 'dark' | 'light' | 'system';
-
 interface UserPreferences {
-  theme: Theme;
   defaultVolume: number;
   autoplay: boolean;
   showLyrics: boolean;
@@ -15,7 +15,10 @@ interface UserPreferences {
 
 export function Settings() {
   const { user, updateUser, logout } = useAuthStore();
-  const { volume, setVolume } = usePlayerStore();
+  const { volume, setVolume, crossfade, setCrossfade, radioMode, setRadioMode } = usePlayerStore();
+  const { theme: currentTheme, setTheme } = useThemeStore();
+  const { connected: lastfmConnected, username: lastfmUsername, setSession: setLastfmSession, disconnect: disconnectLastfm } = useLastfmStore();
+  const { connected: spotifyConnected, user: spotifyUser, setAuth: setSpotifyAuth, disconnect: disconnectSpotify } = useSpotifyStore();
   
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'password'>('profile');
   const [saving, setSaving] = useState(false);
@@ -48,6 +51,48 @@ export function Settings() {
       setEmail(user.email || '');
     }
   }, [user]);
+
+  // Handle Last.fm callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const isLastfmCallback = params.get('lastfm') === 'callback';
+    
+    if (token && isLastfmCallback) {
+      // Exchange token for session
+      api.post('/lastfm/callback', { token })
+        .then(res => {
+          setLastfmSession(res.data.username, res.data.sessionKey);
+          // Clean URL
+          window.history.replaceState({}, '', '/settings');
+        })
+        .catch(err => {
+          console.error('Last.fm auth failed:', err);
+          alert('Failed to connect Last.fm');
+          window.history.replaceState({}, '', '/settings');
+        });
+    }
+    
+    // Handle Spotify callback
+    const code = params.get('code');
+    if (code && !token) {
+      api.post('/spotify/callback', { code })
+        .then(res => {
+          setSpotifyAuth(
+            res.data.accessToken,
+            res.data.refreshToken,
+            res.data.expiresIn,
+            res.data.user
+          );
+          window.history.replaceState({}, '', '/settings');
+        })
+        .catch(err => {
+          console.error('Spotify auth failed:', err);
+          alert('Failed to connect Spotify');
+          window.history.replaceState({}, '', '/settings');
+        });
+    }
+  }, [setLastfmSession, setSpotifyAuth]);
 
   const savePreferences = (newPrefs: UserPreferences) => {
     setPreferences(newPrefs);
@@ -176,23 +221,29 @@ export function Settings() {
               Theme
             </label>
             <div className="flex gap-2 flex-wrap">
-              {(['dark', 'light', 'system'] as Theme[]).map((theme) => (
-                <button
-                  key={theme}
-                  onClick={() => savePreferences({ ...preferences, theme })}
-                  className={`px-4 py-2 rounded-md capitalize transition-colors ${
-                    preferences.theme === theme
-                      ? 'bg-[#1ed760] text-black'
-                      : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
-                  }`}
-                >
-                  {theme}
-                </button>
-              ))}
+              <button
+                onClick={() => setTheme('dark')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+                  currentTheme === 'dark'
+                    ? 'bg-[#1ed760] text-black'
+                    : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
+                }`}
+              >
+                <Moon size={16} />
+                Dark
+              </button>
+              <button
+                onClick={() => setTheme('light')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+                  currentTheme === 'light'
+                    ? 'bg-[#1ed760] text-black'
+                    : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
+                }`}
+              >
+                <Sun size={16} />
+                Light
+              </button>
             </div>
-            <p className="text-xs text-[#6a6a6a] mt-2">
-              Note: Light theme coming soon
-            </p>
           </div>
 
           <div>
@@ -208,6 +259,45 @@ export function Settings() {
               onChange={(e) => savePreferences({ ...preferences, defaultVolume: parseInt(e.target.value) })}
               className="w-full h-2 accent-[#1ed760]"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-white mb-2">
+              Crossfade: {crossfade === 0 ? 'Off' : `${crossfade}s`}
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={12}
+              step={1}
+              value={crossfade}
+              onChange={(e) => setCrossfade(parseInt(e.target.value))}
+              className="w-full h-2 accent-[#1ed760]"
+            />
+            <p className="text-xs text-[#6a6a6a] mt-1">
+              Smoothly fade between tracks (local files only)
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="block text-sm font-semibold text-white">
+                Radio Mode
+              </label>
+              <p className="text-xs text-[#6a6a6a]">
+                Auto-play similar YouTube tracks when queue ends
+              </p>
+            </div>
+            <button
+              onClick={() => setRadioMode(!radioMode)}
+              className={`w-12 h-6 rounded-full transition-colors ${
+                radioMode ? 'bg-[#1ed760]' : 'bg-[#535353]'
+              }`}
+            >
+              <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                radioMode ? 'translate-x-6' : 'translate-x-0.5'
+              }`} />
+            </button>
           </div>
 
           <div className="flex items-center justify-between">
@@ -250,6 +340,91 @@ export function Settings() {
                 preferences.showLyrics ? 'translate-x-6' : 'translate-x-0.5'
               }`} />
             </button>
+          </div>
+
+          {/* Last.fm Integration */}
+          <div className="border-t border-[#282828] pt-6 mt-6">
+            <h3 className="text-sm font-semibold text-white mb-4">Last.fm Scrobbling</h3>
+            {lastfmConnected ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white">Connected as <span className="text-[#1ed760]">{lastfmUsername}</span></p>
+                  <p className="text-xs text-[#6a6a6a]">Your listening history is being scrobbled</p>
+                </div>
+                <button
+                  onClick={disconnectLastfm}
+                  className="px-4 py-2 text-sm border border-red-500 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-colors"
+                >
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white">Connect to Last.fm</p>
+                  <p className="text-xs text-[#6a6a6a]">Scrobble your listening history</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.get('/lastfm/auth-url');
+                      window.location.href = res.data.url;
+                    } catch (err) {
+                      console.error('Failed to get Last.fm auth URL:', err);
+                      alert('Last.fm integration is not configured on the server');
+                    }
+                  }}
+                  className="px-4 py-2 text-sm bg-[#d51007] text-white rounded-full hover:bg-[#ba0d06] transition-colors"
+                >
+                  Connect Last.fm
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Spotify Connect */}
+          <div className="border-t border-[#282828] pt-6 mt-6">
+            <h3 className="text-sm font-semibold text-white mb-4">Spotify Connect</h3>
+            {spotifyConnected ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white">
+                    Connected as <span className="text-[#1ed760]">{spotifyUser?.displayName}</span>
+                    {spotifyUser?.product !== 'premium' && (
+                      <span className="ml-2 text-xs text-yellow-500">(Premium required for playback)</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-[#6a6a6a]">Stream from Spotify library</p>
+                </div>
+                <button
+                  onClick={disconnectSpotify}
+                  className="px-4 py-2 text-sm border border-red-500 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-colors"
+                >
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white">Connect to Spotify</p>
+                  <p className="text-xs text-[#6a6a6a]">Requires Spotify Premium for playback</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.get('/spotify/auth-url');
+                      window.location.href = res.data.url;
+                    } catch (err) {
+                      console.error('Failed to get Spotify auth URL:', err);
+                      alert('Spotify integration is not configured on the server');
+                    }
+                  }}
+                  className="px-4 py-2 text-sm bg-[#1ed760] text-black font-semibold rounded-full hover:bg-[#1db954] transition-colors"
+                >
+                  Connect Spotify
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

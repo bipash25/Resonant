@@ -12,6 +12,8 @@ interface PlayerState {
   progress: number;      // Current time in seconds
   duration: number;      // Total duration in seconds
   playbackSpeed: number; // 0.5 - 2.0
+  crossfade: number;     // Crossfade duration in seconds (0 = off)
+  radioMode: boolean;    // Auto-play similar tracks when queue ends
   
   // Queue
   queue: Track[];
@@ -54,6 +56,12 @@ interface PlayerState {
   setSleepTimer: (minutes: number | null) => void;
   checkSleepTimer: () => boolean; // Returns true if should stop
   
+  // Crossfade
+  setCrossfade: (seconds: number) => void;
+  
+  // Radio mode
+  setRadioMode: (enabled: boolean) => void;
+  
   // Track actions
   toggleCurrentTrackLike: () => void;
 }
@@ -75,6 +83,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   
   sleepTimer: null,
   sleepTimerEnd: null,
+  crossfade: 0,
+  radioMode: false,
   
   setTrack: (track) => set({ currentTrack: track, progress: 0, isPlaying: true }),
   
@@ -265,5 +275,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       currentTrack: updatedTrack,
       queue: updatedQueue
     });
-  }
+  },
+  
+  setCrossfade: (seconds) => set({ crossfade: Math.max(0, Math.min(12, seconds)) }),
+  
+  setRadioMode: (enabled) => set({ radioMode: enabled })
 }));

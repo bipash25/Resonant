@@ -14,9 +14,16 @@ import {
   ChevronDown,
   ListMusic,
   Timer,
-  Gauge
+  Gauge,
+  Mic2,
+  Sliders
 } from 'lucide-react';
 import { usePlayerStore } from '../store/playerStore';
+import { useEqualizer } from '../hooks/useEqualizer';
+import { useLastfmScrobbler } from '../hooks/useLastfmScrobbler';
+import QueuePanel from './QueuePanel';
+import LyricsPanel from './LyricsPanel';
+import EqualizerPanel from './EqualizerPanel';
 import api from '../lib/api';
 
 declare global {
@@ -145,6 +152,9 @@ function NowPlayingModal({
   onLike,
   onSetPlaybackSpeed,
   onSetSleepTimer,
+  onShowQueue,
+  onShowLyrics,
+  onShowEqualizer,
   formatTime
 }: {
   isOpen: boolean;
@@ -172,7 +182,10 @@ function NowPlayingModal({
   onLike: () => void;
   onSetPlaybackSpeed: (speed: number) => void;
   onSetSleepTimer: (minutes: number | null) => void;
-  formatTime: (s: number) => string;
+  onShowQueue: () => void;
+  onShowLyrics: () => void;
+  onShowEqualizer: () => void;
+  formatTime: (seconds: number) => string;
 }) {
   const [showSpeedPopup, setShowSpeedPopup] = useState(false);
   const [showTimerPopup, setShowTimerPopup] = useState(false);
@@ -192,9 +205,17 @@ function NowPlayingModal({
             <div className="text-xs text-[#6a6a6a]">{queueIndex + 1} / {queue.length}</div>
           )}
         </div>
-        <button className="p-2 text-[#b3b3b3]">
-          <ListMusic size={24} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button className="p-2 text-[#b3b3b3]" onClick={onShowEqualizer}>
+            <Sliders size={24} />
+          </button>
+          <button className="p-2 text-[#b3b3b3]" onClick={onShowLyrics}>
+            <Mic2 size={24} />
+          </button>
+          <button className="p-2 text-[#b3b3b3]" onClick={onShowQueue}>
+            <ListMusic size={24} />
+          </button>
+        </div>
       </div>
 
       {/* Album Art */}
@@ -373,6 +394,15 @@ export function Player() {
   const [ytPlayerReady, setYtPlayerReady] = useState(false);
   const [ytPlayerKey, setYtPlayerKey] = useState(0);
   const [showNowPlaying, setShowNowPlaying] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [showEqualizer, setShowEqualizer] = useState(false);
+
+  // Web Audio EQ (for local files only)
+  useEqualizer({ audioElement: audioRef.current });
+  
+  // Last.fm scrobbling
+  useLastfmScrobbler();
 
   const {
     currentTrack,
@@ -401,7 +431,10 @@ export function Player() {
     previous,
     toggleShuffle,
     cycleRepeat,
-    toggleCurrentTrackLike
+    toggleCurrentTrackLike,
+    crossfade,
+    radioMode,
+    addToQueue
   } = usePlayerStore();
 
   // Media Session API - for lock screen controls
@@ -487,6 +520,28 @@ export function Player() {
     return null;
   }, [isLocal, currentTrack]);
 
+  // Radio mode: fetch and queue similar tracks
+  const fetchRadioTracks = useCallback(async () => {
+    if (!currentTrack || !radioMode) return;
+    
+    try {
+      // Search YouTube for similar tracks based on current track's artist/title
+      const searchQuery = currentTrack.artist 
+        ? `${currentTrack.artist} similar songs`
+        : `${currentTrack.title} similar`;
+      
+      const res = await api.get('/youtube/search', { params: { q: searchQuery, limit: 5 } });
+      
+      if (res.data && res.data.length > 0) {
+        // Add tracks to queue (skip first if it's the same as current)
+        const newTracks = res.data.filter((t: any) => t.sourceId !== currentTrack.sourceId);
+        newTracks.forEach((track: any) => addToQueue(track));
+      }
+    } catch (err) {
+      console.error('Failed to fetch radio tracks:', err);
+    }
+  }, [currentTrack, radioMode, addToQueue]);
+
   // Handle ended callback
   const handleEnded = useCallback(() => {
     if (repeat === 'one') {
@@ -500,9 +555,15 @@ export function Player() {
       }
       play();
     } else {
+      // Check if we're at the end of queue
+      const isLastTrack = queueIndex >= queue.length - 1;
+      if (isLastTrack && radioMode && repeat !== 'all') {
+        // Fetch more tracks for radio mode before calling next
+        fetchRadioTracks();
+      }
       next();
     }
-  }, [repeat, next, play, ytPlayerReady]);
+  }, [repeat, next, play, ytPlayerReady, queueIndex, queue.length, radioMode, fetchRadioTracks]);
 
   // Function to clean up YouTube player properly
   const cleanupYouTubePlayer = useCallback(() => {
@@ -714,6 +775,25 @@ export function Player() {
     }
   }, [volume, muted]);
 
+  // Crossfade effect for local files
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !isLocal || !isPlaying || crossfade === 0 || duration === 0) return;
+    
+    const timeRemaining = duration - progress;
+    const baseVolume = muted ? 0 : volume;
+    
+    if (timeRemaining <= crossfade && timeRemaining > 0) {
+      // Fade out: volume decreases linearly as we approach the end
+      const fadeProgress = 1 - (timeRemaining / crossfade);
+      const fadedVolume = baseVolume * (1 - fadeProgress);
+      audio.volume = Math.max(0, fadedVolume);
+    } else {
+      // Reset to normal volume
+      audio.volume = baseVolume;
+    }
+  }, [isLocal, isPlaying, crossfade, duration, progress, volume, muted]);
+
   // Sync local audio playback speed
   useEffect(() => {
     const audio = audioRef.current;
@@ -820,8 +900,20 @@ export function Player() {
         onLike={handleLike}
         onSetPlaybackSpeed={setPlaybackSpeed}
         onSetSleepTimer={setSleepTimer}
+        onShowQueue={() => setShowQueue(true)}
+        onShowLyrics={() => setShowLyrics(true)}
+        onShowEqualizer={() => setShowEqualizer(true)}
         formatTime={formatTime}
       />
+
+      {/* Queue Panel */}
+      <QueuePanel isOpen={showQueue} onClose={() => setShowQueue(false)} />
+
+      {/* Lyrics Panel */}
+      <LyricsPanel isOpen={showLyrics} onClose={() => setShowLyrics(false)} track={currentTrack} />
+
+      {/* Equalizer Panel */}
+      <EqualizerPanel isOpen={showEqualizer} onClose={() => setShowEqualizer(false)} />
 
       <div className="h-16 md:h-20 bg-[#181818] border-t border-[#282828] flex items-center px-2 md:px-4">
         {/* Hidden audio element for local files */}

@@ -1,26 +1,33 @@
 import { Outlet, Navigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Player } from './Player';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 
 export function Layout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const theme = useThemeStore((s) => s.theme);
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-black" style={{ minHeight: '-webkit-fill-available' }}>
+    <div className="h-[100dvh] flex flex-col bg-[var(--bg-primary)]" style={{ minHeight: '-webkit-fill-available' }}>
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center justify-between p-4 bg-black border-b border-[#282828] flex-shrink-0">
-        <h1 className="text-xl font-bold text-white">Resonant</h1>
+      <header className="lg:hidden flex items-center justify-between p-4 bg-[var(--bg-primary)] border-b border-[var(--border)] flex-shrink-0">
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">Resonant</h1>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 text-white"
+          className="p-2 text-[var(--text-primary)]"
         >
           {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -49,7 +56,7 @@ export function Layout() {
         )}
         
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a]">
+        <main className="flex-1 overflow-y-auto bg-gradient-to-b from-[var(--bg-tertiary)] to-[var(--bg-primary)]">
           <div className="p-4 md:p-6">
             <Outlet />
           </div>

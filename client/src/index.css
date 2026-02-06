@@ -1,14 +1,33 @@
 @import "tailwindcss";
 
-:root {
+/* Dark theme (default) */
+:root, [data-theme="dark"] {
   --bg-primary: #0a0a0a;
   --bg-secondary: #121212;
   --bg-tertiary: #1a1a1a;
+  --bg-elevated: #282828;
+  --bg-hover: #3e3e3e;
   --accent: #1ed760;
   --accent-hover: #1db954;
   --text-primary: #ffffff;
   --text-secondary: #b3b3b3;
   --text-muted: #6a6a6a;
+  --border: #282828;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e8e8e8;
+  --bg-elevated: #ffffff;
+  --bg-hover: #e0e0e0;
+  --accent: #1db954;
+  --accent-hover: #1aa34a;
+  --text-primary: #191414;
+  --text-secondary: #535353;
+  --text-muted: #757575;
+  --border: #e0e0e0;
 }
 
 * {
@@ -88,4 +107,31 @@ input[type="range"]::-webkit-slider-thumb {
 
 input[type="range"]:hover::-webkit-slider-thumb {
   opacity: 1;
+}
+
+/* Slide animations */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
 }

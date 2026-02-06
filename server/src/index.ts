@@ -8,6 +8,8 @@ import trackRoutes from './routes/tracks.js';
 import playlistRoutes from './routes/playlists.js';
 import uploadRoutes from './routes/upload.js';
 import searchRoutes from './routes/search.js';
+import lastfmRoutes from './routes/lastfm.js';
+import spotifyRoutes from './routes/spotify.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +35,8 @@ app.use('/api/tracks', trackRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/lastfm', lastfmRoutes);
+app.use('/api/spotify', spotifyRoutes);
 
 // Health check
 app.get('/api/health', (_, res) => {

@@ -220,4 +220,33 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res): Promise<Res
   }
 });
 
+// Get lyrics for a track
+router.get('/lyrics/:artist/:title', async (req, res): Promise<Response | void> => {
+  try {
+    const { artist, title } = req.params;
+    
+    // Clean up artist and title for better matching
+    const cleanArtist = encodeURIComponent(artist.replace(/\s+/g, ' ').trim());
+    const cleanTitle = encodeURIComponent(
+      title
+        .replace(/\s*\(.*?\)\s*/g, '') // Remove parentheses content (feat., remix, etc.)
+        .replace(/\s*\[.*?\]\s*/g, '') // Remove bracket content
+        .replace(/\s+/g, ' ')
+        .trim()
+    );
+    
+    const response = await fetch(`https://api.lyrics.ovh/v1/${cleanArtist}/${cleanTitle}`);
+    
+    if (!response.ok) {
+      return res.status(404).json({ error: 'Lyrics not found' });
+    }
+    
+    const data = await response.json();
+    res.json({ lyrics: data.lyrics || null });
+  } catch (error) {
+    console.error('Get lyrics error:', error);
+    res.status(500).json({ error: 'Failed to get lyrics' });
+  }
+});
+
 export default router;
