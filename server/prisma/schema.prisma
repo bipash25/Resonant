@@ -1,0 +1,110 @@
+// Prisma schema for Resonant music player
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  displayName  String?    @map("display_name")
+  avatarUrl    String?    @map("avatar_url")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  tracks          Track[]
+  playlists       Playlist[]
+  likedTracks     LikedTrack[]
+  recentlyPlayed  RecentlyPlayed[]
+
+  @@map("users")
+}
+
+enum SourceType {
+  LOCAL
+  YOUTUBE
+  SPOTIFY
+}
+
+model Track {
+  id          String     @id @default(cuid())
+  title       String
+  artist      String?
+  album       String?
+  duration    Int?       // Duration in seconds
+  coverUrl    String?    @map("cover_url")
+  sourceType  SourceType @map("source_type")
+  sourceId    String?    @map("source_id")    // YouTube video ID or Spotify track ID
+  filePath    String?    @map("file_path")    // For local uploads
+  uploadedBy  String?    @map("uploaded_by")
+  user        User?      @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  playlistTracks PlaylistTrack[]
+  likedBy        LikedTrack[]
+  recentPlays    RecentlyPlayed[]
+
+  @@map("tracks")
+}
+
+model Playlist {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  coverUrl    String?  @map("cover_url")
+  isPublic    Boolean  @default(false) @map("is_public")
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tracks      PlaylistTrack[]
+
+  @@map("playlists")
+}
+
+model PlaylistTrack {
+  id         String   @id @default(cuid())
+  playlistId String   @map("playlist_id")
+  trackId    String   @map("track_id")
+  position   Int      // Order within playlist
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, trackId])
+  @@map("playlist_tracks")
+}
+
+model LikedTrack {
+  id      String   @id @default(cuid())
+  userId  String   @map("user_id")
+  trackId String   @map("track_id")
+  likedAt DateTime @default(now()) @map("liked_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track   Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trackId])
+  @@map("liked_tracks")
+}
+
+model RecentlyPlayed {
+  id       String   @id @default(cuid())
+  userId   String   @map("user_id")
+  trackId  String   @map("track_id")
+  playedAt DateTime @default(now()) @map("played_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId, playedAt(sort: Desc)])
+  @@map("recently_played")
+}

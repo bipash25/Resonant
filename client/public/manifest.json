@@ -1,0 +1,31 @@
+{
+  "name": "Resonant",
+  "short_name": "Resonant",
+  "description": "A modern music player for local and YouTube music",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#1ed760",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["music", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Search",
+      "url": "/search",
+      "description": "Search for music"
+    },
+    {
+      "name": "Library",
+      "url": "/library",
+      "description": "Your music library"
+    }
+  ]
+}
