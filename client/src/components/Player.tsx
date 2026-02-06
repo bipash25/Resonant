@@ -400,7 +400,8 @@ export function Player() {
     next,
     previous,
     toggleShuffle,
-    cycleRepeat
+    cycleRepeat,
+    toggleCurrentTrackLike
   } = usePlayerStore();
 
   // Media Session API - for lock screen controls
@@ -743,6 +744,8 @@ export function Player() {
     if (!currentTrack) return;
     try {
       await api.post(`/tracks/${currentTrack.id}/like`);
+      // Update the store with new like state
+      toggleCurrentTrackLike();
     } catch (err) {
       console.error('Failed to like track:', err);
     }

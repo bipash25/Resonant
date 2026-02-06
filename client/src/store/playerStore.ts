@@ -53,6 +53,9 @@ interface PlayerState {
   // Sleep timer actions
   setSleepTimer: (minutes: number | null) => void;
   checkSleepTimer: () => boolean; // Returns true if should stop
+  
+  // Track actions
+  toggleCurrentTrackLike: () => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -247,5 +250,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return true;
     }
     return false;
+  },
+  
+  toggleCurrentTrackLike: () => {
+    const { currentTrack, queue, queueIndex } = get();
+    if (!currentTrack) return;
+    
+    const newIsLiked = !currentTrack.isLiked;
+    const updatedTrack = { ...currentTrack, isLiked: newIsLiked };
+    const updatedQueue = [...queue];
+    updatedQueue[queueIndex] = updatedTrack;
+    
+    set({
+      currentTrack: updatedTrack,
+      queue: updatedQueue
+    });
   }
 }));
